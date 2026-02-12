@@ -1,3 +1,3 @@
 fn main() {
-    println!("Hello, world!");
+    println!("snake_gui core library ready. Run `cargo test` to verify behavior.");
 }
