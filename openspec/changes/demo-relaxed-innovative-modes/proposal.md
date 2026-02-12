@@ -1,32 +1,33 @@
 ## Why
 
-The current Snake demo lacks a clear product loop that matches a relaxed, practice-friendly experience while still showcasing innovation. This change defines a stable mode system and progression contract now so later implementation stays coherent and testable.
+The current repository only provides core logic scaffolding and does not deliver a playable graphical Snake experience. This change is needed now to make the demo visually interactive in a GUI while preserving the relaxed training loop and innovation-focused mode design.
 
 ## What Changes
 
-- Introduce a three-mode structure (`practice`, `challenge`, `experimental`) that shares one map rule set.
-- Add an `invincible` play mode with no death state (collision causes reposition), a separate high-score leaderboard, and persistent cross-run length accumulation.
-- Define permanent unlock thresholds for experimental tools using invincible-mode cumulative length (`15/40/80/140/...`).
-- Add experimental loadouts with three slots and mixed tool categories (control-assist and rule-modifying).
-- Define challenge mode success metric as survival time, while allowing tool effects to influence same-board results.
-- Remove textual milestone-achievement progression (no “+10 length literary achievements”).
-- Keep sudden death behavior in mortal modes, with optional replay toggle in settings.
-- Exclude daily/weekly mission systems from scope.
+- Deliver a playable desktop GUI Snake demo with real-time board rendering, keyboard input, and run lifecycle feedback.
+- Provide GUI navigation for mode selection, including `practice`, `challenge`, `experimental`, and `invincible`, while keeping one shared map rule set.
+- Keep sudden death in mortal modes and provide an optional replay toggle in settings.
+- Keep invincible behavior as non-terminal collision with safe reposition, plus a dedicated invincible leaderboard.
+- Persist invincible cumulative length and use permanent unlock thresholds (`15/40/80/140/...`) for experimental tools.
+- Provide a pre-run experimental loadout UI with exactly three slots and mixed tool categories (control-assist and rule-modifying).
+- Show mode-scoped leaderboard entries with run metadata (mode and loadout summary).
+- Explicitly exclude literary milestone achievements and daily/weekly mission systems.
 
 ## Capabilities
 
 ### New Capabilities
+- `gui-runtime-and-navigation`: Defines desktop window lifecycle, board rendering, keyboard control handling, and screen flow for menu/settings/leaderboard/run states.
 - `mode-system-and-rules`: Defines practice/challenge/experimental/invincible mode behaviors, shared map policy, death/reposition semantics, and scoring boundaries.
 - `invincible-length-progression`: Defines persistent cumulative length tracking in invincible mode and threshold-based permanent unlock logic.
-- `experimental-tool-loadout`: Defines three-slot loadout behavior and eligible tool categories for experimental gameplay.
-- `leaderboard-segmentation`: Defines separate leaderboard treatment for invincible mode and challenge scoring expectations.
+- `experimental-tool-loadout`: Defines three-slot loadout behavior, GUI selection flow, and eligible tool categories for experimental gameplay.
+- `leaderboard-segmentation`: Defines separate leaderboard treatment for invincible mode, challenge ranking expectations, and metadata display requirements.
 
 ### Modified Capabilities
 - None.
 
 ## Impact
 
-- Affected game systems: runtime mode state machine, collision/death pipeline, score calculation, progression persistence, tool activation flow, and end-of-run summary behavior.
-- Affected UX surfaces: mode select, settings (replay toggle), tool loadout UI, run summary, and leaderboard views.
-- Affected data/storage: persistent profile fields for cumulative invincible length, unlock state, and mode-specific scores.
-- No external API or third-party dependency changes are required by this proposal.
+- Affected runtime systems: simulation loop integration with render loop, input handling, collision/death pipeline, scoring, progression persistence, and leaderboard persistence.
+- Affected UX surfaces: mode select screen, in-game HUD, run summary, settings (replay toggle), loadout panel, and leaderboard views.
+- Affected dependencies: GUI/windowing stack selection and integration (framework-specific choice to be finalized in design).
+- Affected quality scope: automated tests for core logic plus manual GUI verification for navigation, rendering, and mode-specific run behavior.

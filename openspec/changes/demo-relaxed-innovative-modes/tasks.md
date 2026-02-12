@@ -21,24 +21,31 @@
 - [x] 3.4 Add migration/backfill handling for legacy profiles and rollback-safe schema version checks.
 - [x] 3.5 Add tests for threshold crossing, idempotent permanent unlocks, and deterministic rebuild after restart.
 
-## 4. Experimental Tool Loadout
+## 4. Experimental Tool Loadout Core
 
 - [x] 4.1 Implement tool definition schema with category metadata (`control-assist`, `rule-modifying`, `hybrid`) and compatibility validation hooks.
-- [x] 4.2 Build pre-run experimental loadout flow requiring exactly three slots and snapshotting selected tools at run start.
+- [x] 4.2 Build pre-run experimental loadout validation requiring exactly three slots and snapshotting selected tools at run start.
 - [x] 4.3 Enforce unlock gating so locked tools cannot be equipped and newly unlocked tools become selectable in subsequent setup flows.
 - [x] 4.4 Apply active loadout effects during experimental runs and ensure effects stay fixed for the run duration.
 - [x] 4.5 Add tests for slot-count enforcement, lock rejection, and runtime stability of active loadout snapshots.
 
-## 5. Death Presentation And Settings
+## 5. GUI Runtime Foundation
 
-- [x] 5.1 Add a user setting to toggle replay-on-death behavior with sensible default and persistent storage.
-- [x] 5.2 Wire mortal death pipeline to either immediate restart/summary or short replay path based on toggle value.
-- [x] 5.3 Ensure invincible mode bypasses death replay path and always continues via reposition behavior.
-- [x] 5.4 Add tests for replay toggle behavior and regression coverage for sudden death pacing in mortal modes.
+- [ ] 5.1 Add desktop GUI dependencies and create a windowed app shell replacing the placeholder CLI entrypoint.
+- [ ] 5.2 Implement screen state machine for `MainMenu`, `ModeSelect`, `Loadout`, `Running`, `Summary`, `Leaderboard`, and `Settings`.
+- [ ] 5.3 Implement fixed-timestep simulation loop integrated with frame-rate-independent rendering.
+- [ ] 5.4 Implement keyboard input capture and direction queueing for deterministic snake control.
 
-## 6. Integration QA And Definition Of Done
+## 6. GUI Screens And Interaction
 
-- [x] 6.1 Run end-to-end manual verification across all four modes for mode rules, scoring, and progression updates.
-- [x] 6.2 Verify no daily/weekly mission surfaces or literary milestone achievement flows are reachable in UI.
-- [x] 6.3 Validate challenge mode accepts tool-affected runs on the same board and retains row metadata clarity.
-- [x] 6.4 Update release/demo notes documenting mode differences, unlock thresholds, and known trade-offs.
+- [ ] 6.1 Build menu/settings/leaderboard screens and wire transitions between screens.
+- [ ] 6.2 Build experimental loadout screen with exactly three selectable slots and lock-state feedback.
+- [ ] 6.3 Build in-run HUD and end-of-run summary screens with mode-specific metrics.
+- [ ] 6.4 Implement replay-on-death visual path for mortal modes and explicit bypass path for invincible mode.
+
+## 7. Integration QA And Demo Notes
+
+- [ ] 7.1 Wire GUI actions to core engine APIs for mode start, run updates, scoring, unlock updates, and leaderboard writes.
+- [ ] 7.2 Run end-to-end manual verification across all four modes using the GUI build.
+- [ ] 7.3 Verify no daily/weekly mission surfaces or literary milestone achievement flows are reachable in GUI.
+- [ ] 7.4 Update release/demo notes to document GUI controls, screen flow, mode differences, unlock thresholds, and known trade-offs.

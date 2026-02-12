@@ -7,6 +7,10 @@ The system SHALL require a pre-run loadout for experimental mode containing exac
 - **WHEN** the player confirms an experimental run
 - **THEN** the run starts with exactly three selected tools bound as the active loadout
 
+#### Scenario: Display loadout slots in GUI
+- **WHEN** the player opens the experimental loadout screen
+- **THEN** the interface shows exactly three selectable slots before run start
+
 ### Requirement: Tools shall support assist and rule-modifying categories
 The system SHALL support tools categorized as control-assist, rule-modifying, or hybrid. Tool definitions MUST declare category metadata used by selection and validation.
 
