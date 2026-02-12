@@ -31,21 +31,21 @@
 
 ## 5. GUI Runtime Foundation
 
-- [ ] 5.1 Add desktop GUI dependencies and create a windowed app shell replacing the placeholder CLI entrypoint.
-- [ ] 5.2 Implement screen state machine for `MainMenu`, `ModeSelect`, `Loadout`, `Running`, `Summary`, `Leaderboard`, and `Settings`.
-- [ ] 5.3 Implement fixed-timestep simulation loop integrated with frame-rate-independent rendering.
-- [ ] 5.4 Implement keyboard input capture and direction queueing for deterministic snake control.
+- [x] 5.1 Add desktop GUI dependencies and create a windowed app shell replacing the placeholder CLI entrypoint.
+- [x] 5.2 Implement screen state machine for `MainMenu`, `ModeSelect`, `Loadout`, `Running`, `Summary`, `Leaderboard`, and `Settings`.
+- [x] 5.3 Implement fixed-timestep simulation loop integrated with frame-rate-independent rendering.
+- [x] 5.4 Implement keyboard input capture and direction queueing for deterministic snake control.
 
 ## 6. GUI Screens And Interaction
 
-- [ ] 6.1 Build menu/settings/leaderboard screens and wire transitions between screens.
-- [ ] 6.2 Build experimental loadout screen with exactly three selectable slots and lock-state feedback.
-- [ ] 6.3 Build in-run HUD and end-of-run summary screens with mode-specific metrics.
-- [ ] 6.4 Implement replay-on-death visual path for mortal modes and explicit bypass path for invincible mode.
+- [x] 6.1 Build menu/settings/leaderboard screens and wire transitions between screens.
+- [x] 6.2 Build experimental loadout screen with exactly three selectable slots and lock-state feedback.
+- [x] 6.3 Build in-run HUD and end-of-run summary screens with mode-specific metrics.
+- [x] 6.4 Implement replay-on-death visual path for mortal modes and explicit bypass path for invincible mode.
 
 ## 7. Integration QA And Demo Notes
 
-- [ ] 7.1 Wire GUI actions to core engine APIs for mode start, run updates, scoring, unlock updates, and leaderboard writes.
+- [x] 7.1 Wire GUI actions to core engine APIs for mode start, run updates, scoring, unlock updates, and leaderboard writes.
 - [ ] 7.2 Run end-to-end manual verification across all four modes using the GUI build.
-- [ ] 7.3 Verify no daily/weekly mission surfaces or literary milestone achievement flows are reachable in GUI.
-- [ ] 7.4 Update release/demo notes to document GUI controls, screen flow, mode differences, unlock thresholds, and known trade-offs.
+- [x] 7.3 Verify no daily/weekly mission surfaces or literary milestone achievement flows are reachable in GUI.
+- [x] 7.4 Update release/demo notes to document GUI controls, screen flow, mode differences, unlock thresholds, and known trade-offs.

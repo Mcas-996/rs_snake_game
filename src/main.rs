@@ -1,3 +1,6 @@
-fn main() {
-    println!("snake_gui core library ready. Run `cargo test` to verify behavior.");
+use snake_gui::gui::{run_app, window_conf};
+
+#[macroquad::main(window_conf)]
+async fn main() {
+    run_app().await;
 }

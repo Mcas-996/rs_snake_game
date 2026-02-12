@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+pub mod gui;
+
 pub const CURRENT_SCHEMA_VERSION: u32 = 2;
 pub const DEFAULT_THRESHOLDS: [u64; 4] = [15, 40, 80, 140];
 

@@ -1,5 +1,20 @@
 # Demo Notes: Relaxed Innovative Modes
 
+## GUI Controls
+
+- Menu and screen navigation: `Arrow Keys` or `WASD`
+- Confirm action: `Enter` or `Space`
+- Back action: `Esc` or `Backspace`
+- During run: directional input is queued and consumed one direction per simulation tick
+- During run: `Esc` ends the current run and opens summary
+
+## Screen Flow
+
+- `MainMenu` -> `ModeSelect` -> (`Loadout` for experimental only) -> `Running` -> `Summary` -> `MainMenu`
+- `MainMenu` -> `Leaderboards` -> `MainMenu`
+- `MainMenu` -> `Settings` -> `MainMenu`
+- `Summary` -> `Leaderboards` (optional) -> `MainMenu`
+
 ## Mode Summary
 
 - Practice: shared map rules, immediate death on fatal collision, practice-oriented scoring.
@@ -22,9 +37,11 @@
 
 ## Known Trade-offs
 
-- Challenge and experimental flows allow tool-influenced outcomes on shared boards by design.
+- Challenge flow allows tool-influenced outcomes on a shared board by design.
+- Experimental mode depends on unlock progression and may block early setup until thresholds are reached.
 - Reposition safety in invincible mode depends on available free tiles.
-- Tool compatibility is modeled but intentionally minimal for demo scope.
+- Replay-on-death is intentionally short and only applies to mortal modes.
+- Tool compatibility metadata is modeled, but tool count and compatibility depth are intentionally minimal for demo scope.
 
 ## Out Of Scope
 
