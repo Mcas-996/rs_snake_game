@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use macroquad::prelude::*;
 
@@ -656,8 +657,9 @@ impl SnakeGuiApp {
         match self.engine.start_run(mode, requested_loadout) {
             Ok(run) => {
                 let mut running = RunningState::new(run);
+                let seed = random_seed();
                 let (foods, next_seed) = spawn_food_positions(
-                    0,
+                    seed,
                     &running.run,
                     &running.foods,
                     INITIAL_FOOD_COUNT,
@@ -1395,19 +1397,49 @@ fn next_food_position(seed: u64, run: &GameRun, occupied_foods: &[Point]) -> (Po
     let width = run.board.width.max(1) as usize;
     let height = run.board.height.max(1) as usize;
     let total = width.saturating_mul(height).max(1);
-    let start = seed as usize % total;
+    let mut rng = seed;
 
-    for offset in 0..total {
-        let idx = (start + offset) % total;
+    for _ in 0..total.saturating_mul(2) {
+        rng = lcg_next(rng);
+        let idx = (rng as usize) % total;
+        let x = (idx % width) as i32;
+        let y = (idx / width) as i32;
+        let candidate = Point { x, y };
+        if !run.snake.contains(&candidate)
+            && !occupied_foods.contains(&candidate)
+            && !occupied_foods
+                .iter()
+                .any(|food| points_touch_or_adjacent(*food, candidate))
+        {
+            return (candidate, rng);
+        }
+    }
+
+    for idx in 0..total {
         let x = (idx % width) as i32;
         let y = (idx / width) as i32;
         let candidate = Point { x, y };
         if !run.snake.contains(&candidate) && !occupied_foods.contains(&candidate) {
-            return (candidate, seed.wrapping_add(1));
+            return (candidate, lcg_next(rng));
         }
     }
 
-    (run.snake[0], seed.wrapping_add(1))
+    (run.snake[0], lcg_next(rng))
+}
+
+fn points_touch_or_adjacent(a: Point, b: Point) -> bool {
+    (a.x - b.x).abs() <= 1 && (a.y - b.y).abs() <= 1
+}
+
+fn lcg_next(seed: u64) -> u64 {
+    seed.wrapping_mul(6364136223846793005).wrapping_add(1)
+}
+
+fn random_seed() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0)
 }
 
 fn next_respawn_position(seed: u64, run: &GameRun) -> (Point, u64) {
@@ -1631,6 +1663,20 @@ mod tests {
             .copied();
         assert_eq!(queued, Some(Direction::Up));
         assert_eq!(app.running.as_ref().unwrap().phase, RunningPhase::Active);
+    }
+
+    #[test]
+    fn initial_foods_are_non_contiguous() {
+        let mut app = SnakeGuiApp::new();
+        app.start_mode(GameMode::Practice, None);
+        let foods = &app.running.as_ref().unwrap().foods;
+        assert_eq!(foods.len(), INITIAL_FOOD_COUNT);
+
+        for (i, food_a) in foods.iter().enumerate() {
+            for food_b in foods.iter().skip(i + 1) {
+                assert!(!points_touch_or_adjacent(*food_a, *food_b));
+            }
+        }
     }
 
     #[test]
