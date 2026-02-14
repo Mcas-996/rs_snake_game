@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 repository = "https://github.com/Mcas-996/rs_snake_game"
 homepage = "https://github.com/Mcas-996/rs_snake_game"
+description = "A Snake game with a macroquad desktop GUI."
 license = "Apache-2.0"
 [dependencies]
 macroquad = "0.4.14"
