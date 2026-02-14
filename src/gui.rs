@@ -9,6 +9,9 @@ const WINDOW_HEIGHT: i32 = 760;
 const SIM_TICK_SECONDS: f32 = 0.12;
 const REPLAY_SECONDS: f32 = 0.85;
 const CELL_SIZE: f32 = 32.0;
+const INITIAL_FOOD_COUNT: usize = 10;
+const FOOD_REFILL_EVERY_EATEN: u64 = 2;
+const FOOD_REFILL_COUNT: usize = 3;
 const POINTER_IDLE_SECONDS_OUTSIDE_BOARD: f32 = 0.01;
 const POINTER_DISPLACEMENT_THRESHOLD: f32 = 2.0;
 const POINTER_DWELL_SECONDS: f32 = 0.45;
@@ -146,7 +149,7 @@ struct RunningState {
     replay_timer: f32,
     accumulator: f32,
     tick_seconds: f32,
-    food: Point,
+    foods: Vec<Point>,
     spawn_seed: u64,
     replay_path: Vec<Point>,
     pointer_idle_anchor: Option<Vec2>,
@@ -164,7 +167,7 @@ impl RunningState {
             replay_timer: 0.0,
             accumulator: 0.0,
             tick_seconds: SIM_TICK_SECONDS,
-            food: Point { x: 0, y: 0 },
+            foods: Vec::new(),
             spawn_seed: 0,
             replay_path: Vec::new(),
             pointer_idle_anchor: None,
@@ -653,8 +656,13 @@ impl SnakeGuiApp {
         match self.engine.start_run(mode, requested_loadout) {
             Ok(run) => {
                 let mut running = RunningState::new(run);
-                let (food, next_seed) = next_food_position(0, &running.run);
-                running.food = food;
+                let (foods, next_seed) = spawn_food_positions(
+                    0,
+                    &running.run,
+                    &running.foods,
+                    INITIAL_FOOD_COUNT,
+                );
+                running.foods = foods;
                 running.spawn_seed = next_seed;
                 self.running = Some(running);
                 self.screen = ScreenState::Running;
@@ -738,7 +746,8 @@ impl SnakeGuiApp {
             state.run.board.height,
             state.run.effects.has_soft_wrap,
         );
-        let ate_food = next_head == state.food;
+        let eaten_food_index = state.foods.iter().position(|food| *food == next_head);
+        let ate_food = eaten_food_index.is_some();
         let collides = snake_collides(next_head, &state.run, ate_food);
 
         if collides && state.run.grace_ticks_remaining == 0 {
@@ -762,9 +771,18 @@ impl SnakeGuiApp {
 
         state.run.snake.insert(0, next_head);
         if ate_food {
+            if let Some(index) = eaten_food_index {
+                state.foods.remove(index);
+            }
             state.run.add_food(1);
-            let (food, next_seed) = next_food_position(state.spawn_seed, &state.run);
-            state.food = food;
+            let refill_count = if state.run.metrics.food_eaten % FOOD_REFILL_EVERY_EATEN == 0 {
+                FOOD_REFILL_COUNT
+            } else {
+                0
+            };
+            let (foods, next_seed) =
+                spawn_food_positions(state.spawn_seed, &state.run, &state.foods, refill_count);
+            state.foods.extend(foods);
             state.spawn_seed = next_seed;
         } else {
             state.run.snake.pop();
@@ -969,12 +987,9 @@ impl SnakeGuiApp {
             GRAY,
         );
 
-        draw_cell(
-            origin_x,
-            origin_y,
-            state.food,
-            Color::from_rgba(255, 90, 79, 255),
-        );
+        for food in &state.foods {
+            draw_cell(origin_x, origin_y, *food, Color::from_rgba(255, 90, 79, 255));
+        }
 
         for (i, segment) in state.run.snake.iter().enumerate() {
             let color = if i == 0 {
@@ -1356,7 +1371,27 @@ fn snake_collides(next_head: Point, run: &GameRun, ate_food: bool) -> bool {
         .any(|segment| *segment == next_head)
 }
 
-fn next_food_position(seed: u64, run: &GameRun) -> (Point, u64) {
+fn spawn_food_positions(
+    mut seed: u64,
+    run: &GameRun,
+    existing_foods: &[Point],
+    count: usize,
+) -> (Vec<Point>, u64) {
+    let mut spawned = Vec::with_capacity(count);
+    for _ in 0..count {
+        let occupied: Vec<Point> = existing_foods
+            .iter()
+            .copied()
+            .chain(spawned.iter().copied())
+            .collect();
+        let (food, next_seed) = next_food_position(seed, run, &occupied);
+        seed = next_seed;
+        spawned.push(food);
+    }
+    (spawned, seed)
+}
+
+fn next_food_position(seed: u64, run: &GameRun, occupied_foods: &[Point]) -> (Point, u64) {
     let width = run.board.width.max(1) as usize;
     let height = run.board.height.max(1) as usize;
     let total = width.saturating_mul(height).max(1);
@@ -1367,7 +1402,7 @@ fn next_food_position(seed: u64, run: &GameRun) -> (Point, u64) {
         let x = (idx % width) as i32;
         let y = (idx / width) as i32;
         let candidate = Point { x, y };
-        if !run.snake.contains(&candidate) {
+        if !run.snake.contains(&candidate) && !occupied_foods.contains(&candidate) {
             return (candidate, seed.wrapping_add(1));
         }
     }
