@@ -9,7 +9,7 @@ const WINDOW_HEIGHT: i32 = 760;
 const SIM_TICK_SECONDS: f32 = 0.12;
 const REPLAY_SECONDS: f32 = 0.85;
 const CELL_SIZE: f32 = 32.0;
-const POINTER_IDLE_SECONDS: f32 = 0.2;
+const POINTER_IDLE_SECONDS_OUTSIDE_BOARD: f32 = 0.01;
 const POINTER_DISPLACEMENT_THRESHOLD: f32 = 2.0;
 const POINTER_DWELL_SECONDS: f32 = 0.45;
 const POINTER_IDLE_GRACE_SECONDS: f32 = 0.2;
@@ -511,21 +511,20 @@ impl SnakeGuiApp {
                     if pointer_in_board || has_pointer_intent {
                         state.pointer_idle_anchor = Some(pointer_position);
                         state.pointer_idle_elapsed = 0.0;
-                        return;
-                    }
-
-                    let anchor = state.pointer_idle_anchor.unwrap_or(pointer_position);
-                    if pointer_position.distance(anchor) <= POINTER_DISPLACEMENT_THRESHOLD {
-                        state.pointer_idle_elapsed += dt;
-                        if state.pointer_idle_elapsed >= POINTER_IDLE_SECONDS {
-                            state.phase = RunningPhase::PointerIdlePause;
+                    } else {
+                        let anchor = state.pointer_idle_anchor.unwrap_or(pointer_position);
+                        if pointer_position.distance(anchor) <= POINTER_DISPLACEMENT_THRESHOLD {
+                            state.pointer_idle_elapsed += dt;
+                            if state.pointer_idle_elapsed >= POINTER_IDLE_SECONDS_OUTSIDE_BOARD {
+                                state.phase = RunningPhase::PointerIdlePause;
+                                state.pointer_idle_anchor = Some(pointer_position);
+                                state.pointer_idle_elapsed = 0.0;
+                                entered_idle_pause = true;
+                            }
+                        } else {
                             state.pointer_idle_anchor = Some(pointer_position);
                             state.pointer_idle_elapsed = 0.0;
-                            entered_idle_pause = true;
                         }
-                    } else {
-                        state.pointer_idle_anchor = Some(pointer_position);
-                        state.pointer_idle_elapsed = 0.0;
                     }
                 }
             }
@@ -949,7 +948,7 @@ impl SnakeGuiApp {
             GRAY,
         );
         draw_text(
-            "Pointer idle <=2px for 0.2s pauses. Resume with arrow key or pointer move >2px.",
+            "Pointer outside board idle 10ms pauses. Inside board hover keeps steering.",
             40.0,
             108.0,
             22.0,
@@ -1501,8 +1500,8 @@ mod tests {
         app.start_mode(GameMode::Practice, None);
         assert_eq!(app.screen, ScreenState::Running);
         let outside_board = vec2(40.0, 90.0);
-        app.apply_pointer_input(0.25, outside_board, 0.0);
-        app.apply_pointer_input(0.30, outside_board, 0.0);
+        app.apply_pointer_input(0.004, outside_board, 0.0);
+        app.apply_pointer_input(0.007, outside_board, 0.0);
         assert_eq!(
             app.running.as_ref().unwrap().phase,
             RunningPhase::PointerIdlePause
@@ -1558,6 +1557,44 @@ mod tests {
         app.apply_pointer_input(0.30, inside_board, 0.0);
         app.apply_pointer_input(0.30, inside_board, 0.0);
 
+        assert_eq!(app.running.as_ref().unwrap().phase, RunningPhase::Active);
+    }
+
+    #[test]
+    fn pointer_hover_outside_board_for_10ms_triggers_idle_pause() {
+        let mut app = SnakeGuiApp::new();
+        app.start_mode(GameMode::Practice, None);
+        assert_eq!(app.screen, ScreenState::Running);
+
+        let outside_board = vec2(40.0, 90.0);
+        app.apply_pointer_input(0.005, outside_board, 0.0);
+        assert_eq!(app.running.as_ref().unwrap().phase, RunningPhase::Active);
+
+        app.apply_pointer_input(0.005, outside_board, 0.0);
+        assert_eq!(
+            app.running.as_ref().unwrap().phase,
+            RunningPhase::PointerIdlePause
+        );
+    }
+
+    #[test]
+    fn pointer_hover_inside_board_steers_toward_pointer() {
+        let mut app = SnakeGuiApp::new();
+        app.start_mode(GameMode::Practice, None);
+        assert_eq!(app.screen, ScreenState::Running);
+
+        // Head starts near (5,5); hovering above it should request an Up turn.
+        let inside_board_up = vec2(484.0, 210.0);
+        app.apply_pointer_input(0.005, inside_board_up, 0.0);
+
+        let queued = app
+            .running
+            .as_ref()
+            .unwrap()
+            .queued_directions
+            .front()
+            .copied();
+        assert_eq!(queued, Some(Direction::Up));
         assert_eq!(app.running.as_ref().unwrap().phase, RunningPhase::Active);
     }
 
