@@ -70,5 +70,5 @@ The test suite covers core rules, progression, loadout constraints, and GUI stat
 
 Current implementation is near complete for change `demo-relaxed-innovative-modes` with one remaining manual verification task (`7.2`, end-to-end GUI verification across all modes).
 
-## "Tired of Compiling? 
-If you're a Mac user who finds brew install too 'uncivilized', please donate $99 to my Apple Developer Fund. Help me bring this game to the App Store so you can enjoy it with a single click, just as Steve intended."
+## Tired of Compiling? 
+If you're a Mac user who finds brew install too 'uncivilized', please donate $99 to my Apple Developer Fund. Help me bring this game to the App Store so you can enjoy it with a single click, just as Steve intended.
