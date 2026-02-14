@@ -9,7 +9,7 @@ const WINDOW_HEIGHT: i32 = 760;
 const SIM_TICK_SECONDS: f32 = 0.12;
 const REPLAY_SECONDS: f32 = 0.85;
 const CELL_SIZE: f32 = 32.0;
-const POINTER_IDLE_SECONDS: f32 = 0.5;
+const POINTER_IDLE_SECONDS: f32 = 0.2;
 const POINTER_DISPLACEMENT_THRESHOLD: f32 = 2.0;
 const POINTER_DWELL_SECONDS: f32 = 0.45;
 const POINTER_IDLE_GRACE_SECONDS: f32 = 0.2;
@@ -934,7 +934,7 @@ impl SnakeGuiApp {
             GRAY,
         );
         draw_text(
-            "Pointer idle <=2px for 0.5s pauses. Resume with arrow key or pointer move >2px.",
+            "Pointer idle <=2px for 0.2s pauses. Resume with arrow key or pointer move >2px.",
             40.0,
             108.0,
             22.0,
