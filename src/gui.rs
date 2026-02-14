@@ -492,6 +492,8 @@ impl SnakeGuiApp {
                     if state.idle_grace_timer > 0.0 {
                         state.idle_grace_timer = (state.idle_grace_timer - dt).max(0.0);
                     }
+                    let has_pointer_intent =
+                        direction_toward_pointer(state, pointer_position).is_some();
                     if let Some(direction) = direction_toward_pointer(state, pointer_position) {
                         pointer_direction = Some(direction);
                     } else if let Some(direction) = direction_from_delta(pointer_delta) {
@@ -503,6 +505,12 @@ impl SnakeGuiApp {
 
                     if state.pointer_idle_anchor.is_none() {
                         state.pointer_idle_anchor = Some(pointer_position);
+                    }
+
+                    if has_pointer_intent {
+                        state.pointer_idle_anchor = Some(pointer_position);
+                        state.pointer_idle_elapsed = 0.0;
+                        return;
                     }
 
                     let anchor = state.pointer_idle_anchor.unwrap_or(pointer_position);
@@ -1491,8 +1499,9 @@ mod tests {
     fn enter_pointer_idle_pause(app: &mut SnakeGuiApp) {
         app.start_mode(GameMode::Practice, None);
         assert_eq!(app.screen, ScreenState::Running);
-        app.apply_pointer_input(0.25, vec2(320.0, 320.0), 0.0);
-        app.apply_pointer_input(0.30, vec2(320.0, 320.0), 0.0);
+        let at_head_cell = vec2(484.0, 306.0);
+        app.apply_pointer_input(0.25, at_head_cell, 0.0);
+        app.apply_pointer_input(0.30, at_head_cell, 0.0);
         assert_eq!(
             app.running.as_ref().unwrap().phase,
             RunningPhase::PointerIdlePause
@@ -1520,6 +1529,20 @@ mod tests {
         enter_pointer_idle_pause(&mut app);
 
         app.apply_pointer_input(0.01, vec2(325.5, 320.0), 0.0);
+
+        assert_eq!(app.running.as_ref().unwrap().phase, RunningPhase::Active);
+    }
+
+    #[test]
+    fn pointer_edge_intent_does_not_trigger_idle_pause() {
+        let mut app = SnakeGuiApp::new();
+        app.start_mode(GameMode::Practice, None);
+        assert_eq!(app.screen, ScreenState::Running);
+
+        let hold_top_edge = vec2(470.0, 132.0);
+        app.apply_pointer_input(0.01, hold_top_edge, 0.0);
+        app.apply_pointer_input(0.30, hold_top_edge, 0.0);
+        app.apply_pointer_input(0.30, hold_top_edge, 0.0);
 
         assert_eq!(app.running.as_ref().unwrap().phase, RunningPhase::Active);
     }
