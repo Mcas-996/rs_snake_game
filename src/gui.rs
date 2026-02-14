@@ -492,6 +492,7 @@ impl SnakeGuiApp {
                     if state.idle_grace_timer > 0.0 {
                         state.idle_grace_timer = (state.idle_grace_timer - dt).max(0.0);
                     }
+                    let pointer_in_board = pointer_board_cell(state, pointer_position).is_some();
                     let has_pointer_intent =
                         direction_toward_pointer(state, pointer_position).is_some();
                     if let Some(direction) = direction_toward_pointer(state, pointer_position) {
@@ -507,7 +508,7 @@ impl SnakeGuiApp {
                         state.pointer_idle_anchor = Some(pointer_position);
                     }
 
-                    if has_pointer_intent {
+                    if pointer_in_board || has_pointer_intent {
                         state.pointer_idle_anchor = Some(pointer_position);
                         state.pointer_idle_elapsed = 0.0;
                         return;
@@ -1499,9 +1500,9 @@ mod tests {
     fn enter_pointer_idle_pause(app: &mut SnakeGuiApp) {
         app.start_mode(GameMode::Practice, None);
         assert_eq!(app.screen, ScreenState::Running);
-        let at_head_cell = vec2(484.0, 306.0);
-        app.apply_pointer_input(0.25, at_head_cell, 0.0);
-        app.apply_pointer_input(0.30, at_head_cell, 0.0);
+        let outside_board = vec2(40.0, 90.0);
+        app.apply_pointer_input(0.25, outside_board, 0.0);
+        app.apply_pointer_input(0.30, outside_board, 0.0);
         assert_eq!(
             app.running.as_ref().unwrap().phase,
             RunningPhase::PointerIdlePause
@@ -1543,6 +1544,19 @@ mod tests {
         app.apply_pointer_input(0.01, hold_top_edge, 0.0);
         app.apply_pointer_input(0.30, hold_top_edge, 0.0);
         app.apply_pointer_input(0.30, hold_top_edge, 0.0);
+
+        assert_eq!(app.running.as_ref().unwrap().phase, RunningPhase::Active);
+    }
+
+    #[test]
+    fn pointer_hover_inside_board_does_not_trigger_idle_pause() {
+        let mut app = SnakeGuiApp::new();
+        app.start_mode(GameMode::Practice, None);
+        assert_eq!(app.screen, ScreenState::Running);
+
+        let inside_board = vec2(484.0, 306.0);
+        app.apply_pointer_input(0.30, inside_board, 0.0);
+        app.apply_pointer_input(0.30, inside_board, 0.0);
 
         assert_eq!(app.running.as_ref().unwrap().phase, RunningPhase::Active);
     }
