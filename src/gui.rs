@@ -476,6 +476,7 @@ impl SnakeGuiApp {
     fn apply_pointer_running(&mut self, dt: f32, pointer_position: Vec2, pointer_delta: Vec2) {
         let mut resume_due_to_pointer = false;
         let mut pointer_direction = None;
+        let mut entered_idle_pause = false;
 
         if let Some(state) = self.running.as_mut() {
             match state.phase {
@@ -491,7 +492,9 @@ impl SnakeGuiApp {
                     if state.idle_grace_timer > 0.0 {
                         state.idle_grace_timer = (state.idle_grace_timer - dt).max(0.0);
                     }
-                    if let Some(direction) = direction_from_delta(pointer_delta) {
+                    if let Some(direction) = direction_toward_pointer(state, pointer_position) {
+                        pointer_direction = Some(direction);
+                    } else if let Some(direction) = direction_from_delta(pointer_delta) {
                         pointer_direction = Some(direction);
                     }
                     if state.idle_grace_timer > 0.0 {
@@ -509,6 +512,7 @@ impl SnakeGuiApp {
                             state.phase = RunningPhase::PointerIdlePause;
                             state.pointer_idle_anchor = Some(pointer_position);
                             state.pointer_idle_elapsed = 0.0;
+                            entered_idle_pause = true;
                         }
                     } else {
                         state.pointer_idle_anchor = Some(pointer_position);
@@ -521,8 +525,10 @@ impl SnakeGuiApp {
         if resume_due_to_pointer {
             self.resume_from_pointer_idle_pause(Some(pointer_position));
         }
-        if let Some(direction) = pointer_direction {
-            self.enqueue_running_direction(direction);
+        if !entered_idle_pause {
+            if let Some(direction) = pointer_direction {
+                self.enqueue_running_direction(direction);
+            }
         }
     }
 
@@ -1222,6 +1228,57 @@ fn direction_from_delta(delta: Vec2) -> Option<Direction> {
     } else {
         Some(Direction::Up)
     }
+}
+
+fn direction_toward_pointer(state: &RunningState, pointer_position: Vec2) -> Option<Direction> {
+    let target = pointer_board_cell(state, pointer_position)?;
+    let head = state.run.snake[0];
+    let dx = target.x - head.x;
+    let dy = target.y - head.y;
+    if dx == 0 && dy == 0 {
+        return None;
+    }
+
+    if dx.abs() >= dy.abs() {
+        if dx > 0 {
+            Some(Direction::Right)
+        } else {
+            Some(Direction::Left)
+        }
+    } else if dy > 0 {
+        Some(Direction::Down)
+    } else {
+        Some(Direction::Up)
+    }
+}
+
+fn pointer_board_cell(state: &RunningState, pointer_position: Vec2) -> Option<Point> {
+    let board_width = state.run.board.width as f32 * CELL_SIZE;
+    let board_height = state.run.board.height as f32 * CELL_SIZE;
+    let origin_x = (ui_screen_width() - board_width) / 2.0;
+    let origin_y = 130.0;
+
+    if pointer_position.x < origin_x
+        || pointer_position.x >= origin_x + board_width
+        || pointer_position.y < origin_y
+        || pointer_position.y >= origin_y + board_height
+    {
+        return None;
+    }
+
+    let x = ((pointer_position.x - origin_x) / CELL_SIZE).floor() as i32;
+    let y = ((pointer_position.y - origin_y) / CELL_SIZE).floor() as i32;
+    Some(Point { x, y })
+}
+
+#[cfg(test)]
+fn ui_screen_width() -> f32 {
+    WINDOW_WIDTH as f32
+}
+
+#[cfg(not(test))]
+fn ui_screen_width() -> f32 {
+    screen_width()
 }
 
 fn main_menu_item_at(pointer_position: Vec2) -> Option<usize> {
