@@ -19,9 +19,10 @@ The system SHALL accept keyboard direction input and pointer-derived direction i
 - **THEN** the next simulation tick applies that direction consistently regardless of current render frame timing
 
 #### Scenario: Pause active run when pointer is idle
-- **WHEN** pointer displacement remains less than or equal to 2 pixels for at least 0.5 seconds during active play
+- **WHEN** pointer displacement remains less than or equal to 2 pixels for at least 0.2 seconds during active play
 - **THEN** the active run enters pointer-idle pause and simulation ticks stop advancing until resume criteria is met
 
 #### Scenario: Resume from pointer-idle pause
 - **WHEN** the run is in pointer-idle pause and the player presses an arrow key or pointer displacement exceeds 2 pixels
 - **THEN** the run resumes active simulation and movement updates continue on deterministic ticks
+

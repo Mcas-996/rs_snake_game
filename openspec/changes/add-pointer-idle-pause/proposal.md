@@ -5,7 +5,7 @@ Current runtime control assumes continuous keyboard input and provides no pointe
 ## What Changes
 
 - Add pointer-first runtime control semantics for active runs, including directional intent from pointer movement.
-- Add idle-detection behavior during active runs: if pointer movement remains within a 2px threshold for 0.5 seconds, the run pauses.
+- Add idle-detection behavior during active runs: if pointer movement remains within a 2px threshold for 0.2 seconds, the run pauses.
 - Define resume behavior for pointer-idle pause: resume on arrow-key input or renewed pointer movement above threshold.
 - Add non-click pointer navigation semantics for menu-oriented screens (hover/focus, dwell confirmation, and scroll navigation) so click is not required.
 - Update GUI control/help text expectations to reflect keyboard-plus-pointer behavior.
@@ -28,3 +28,4 @@ None.
   - No new runtime dependencies required.
 - Systems:
   - Desktop interaction model shifts to pointer-first support while retaining keyboard compatibility.
+

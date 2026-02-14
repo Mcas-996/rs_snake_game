@@ -3,7 +3,7 @@
 The GUI runtime currently accepts keyboard-only navigation and direction control through a shared `UiCommand` dispatch path in `src/gui.rs`. The user experience target is pointer-first touchpad play without mandatory click actions, while preserving deterministic movement and existing mode/replay behavior.
 
 The requested pointer idle semantics are explicit and fixed:
-- Idle threshold time: 0.5 seconds
+- Idle threshold time: 0.2 seconds
 - Idle motion threshold: pointer movement <= 2px counts as idle
 - Resume from idle pause: arrow-key input OR pointer movement > 2px
 
@@ -12,7 +12,7 @@ The requested pointer idle semantics are explicit and fixed:
 **Goals:**
 - Introduce pointer-first control as a first-class input path across menu and running screens.
 - Define non-click interaction semantics for menu navigation (hover/focus, dwell confirm, scroll traversal).
-- Define deterministic idle-pause behavior in active runs using the agreed 0.5s/2px policy.
+- Define deterministic idle-pause behavior in active runs using the agreed 0.2s/2px policy.
 - Keep keyboard controls fully functional and backward compatible.
 
 **Non-Goals:**
@@ -37,7 +37,7 @@ Alternatives considered:
 Active runs gain a paused-by-idle sub-state. Simulation ticks do not advance while paused-by-idle.
 
 Entry condition:
-- Pointer displacement remains <= 2px for >= 0.5s during active run.
+- Pointer displacement remains <= 2px for >= 0.2s during active run.
 
 Exit condition:
 - Arrow key input OR pointer movement > 2px.
@@ -76,3 +76,4 @@ Rationale:
 - [Risk] Dwell interactions may feel slow for expert users. -> Mitigation: keep keyboard parity and tune dwell thresholds through testing.
 - [Risk] Pointer semantics may differ across desktop environments. -> Mitigation: constrain behavior to broadly available pointer position and wheel signals.
 - [Risk] Increased input-state complexity can regress navigation. -> Mitigation: add focused GUI tests for idle pause transitions and non-click menu flows.
+
