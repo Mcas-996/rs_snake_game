@@ -9,6 +9,10 @@ const WINDOW_HEIGHT: i32 = 760;
 const SIM_TICK_SECONDS: f32 = 0.12;
 const REPLAY_SECONDS: f32 = 0.85;
 const CELL_SIZE: f32 = 32.0;
+const POINTER_IDLE_SECONDS: f32 = 0.5;
+const POINTER_DISPLACEMENT_THRESHOLD: f32 = 2.0;
+const POINTER_DWELL_SECONDS: f32 = 0.45;
+const POINTER_IDLE_GRACE_SECONDS: f32 = 0.2;
 
 const MAIN_MENU_ITEMS: [&str; 3] = ["Play", "Leaderboards", "Settings"];
 const MODES: [GameMode; 4] = [
@@ -62,7 +66,16 @@ enum UiCommand {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RunningPhase {
     Active,
+    PointerIdlePause,
     Replay,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PointerFocusTarget {
+    MainMenuItem(usize),
+    ModeItem(usize),
+    LoadoutSlot(usize),
+    SettingsToggle,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -136,6 +149,9 @@ struct RunningState {
     food: Point,
     spawn_seed: u64,
     replay_path: Vec<Point>,
+    pointer_idle_anchor: Option<Vec2>,
+    pointer_idle_elapsed: f32,
+    idle_grace_timer: f32,
 }
 
 impl RunningState {
@@ -151,6 +167,9 @@ impl RunningState {
             food: Point { x: 0, y: 0 },
             spawn_seed: 0,
             replay_path: Vec::new(),
+            pointer_idle_anchor: None,
+            pointer_idle_elapsed: 0.0,
+            idle_grace_timer: 0.0,
         }
     }
 }
@@ -175,6 +194,12 @@ pub struct SnakeGuiApp {
     running: Option<RunningState>,
     summary: Option<RunSummary>,
     message: Option<String>,
+    pointer_last_position: Option<Vec2>,
+    pointer_focus_target: Option<PointerFocusTarget>,
+    pointer_focus_dwell: f32,
+    pointer_focus_armed: bool,
+    pointer_back_dwell: f32,
+    pointer_back_armed: bool,
 }
 
 impl SnakeGuiApp {
@@ -193,11 +218,20 @@ impl SnakeGuiApp {
             running: None,
             summary: None,
             message: None,
+            pointer_last_position: None,
+            pointer_focus_target: None,
+            pointer_focus_dwell: 0.0,
+            pointer_focus_armed: false,
+            pointer_back_dwell: 0.0,
+            pointer_back_armed: false,
         }
     }
 
     pub fn update(&mut self, dt: f32) {
         self.poll_keyboard_commands();
+        let (mx, my) = mouse_position();
+        let (_, wheel_y) = mouse_wheel();
+        self.apply_pointer_input(dt, vec2(mx, my), wheel_y);
         if self.screen == ScreenState::Running {
             self.update_running(dt);
         }
@@ -318,10 +352,10 @@ impl SnakeGuiApp {
 
     fn apply_running_command(&mut self, command: UiCommand) {
         match command {
-            UiCommand::Up => self.enqueue_direction(Direction::Up),
-            UiCommand::Down => self.enqueue_direction(Direction::Down),
-            UiCommand::Left => self.enqueue_direction(Direction::Left),
-            UiCommand::Right => self.enqueue_direction(Direction::Right),
+            UiCommand::Up => self.enqueue_running_direction(Direction::Up),
+            UiCommand::Down => self.enqueue_running_direction(Direction::Down),
+            UiCommand::Left => self.enqueue_running_direction(Direction::Left),
+            UiCommand::Right => self.enqueue_running_direction(Direction::Right),
             UiCommand::Back => self.complete_running_session(),
             UiCommand::Confirm => {}
         }
@@ -414,6 +448,192 @@ impl SnakeGuiApp {
         }
     }
 
+    fn enqueue_running_direction(&mut self, direction: Direction) {
+        self.resume_from_pointer_idle_pause(None);
+        self.enqueue_direction(direction);
+    }
+
+    fn apply_pointer_input(&mut self, dt: f32, pointer_position: Vec2, wheel_y: f32) {
+        let pointer_delta = self
+            .pointer_last_position
+            .map(|last| pointer_position - last)
+            .unwrap_or(Vec2::ZERO);
+        self.pointer_last_position = Some(pointer_position);
+
+        if self.screen == ScreenState::Running {
+            self.apply_pointer_running(dt, pointer_position, pointer_delta);
+            self.pointer_focus_target = None;
+            self.pointer_focus_dwell = 0.0;
+            self.pointer_focus_armed = false;
+            self.pointer_back_dwell = 0.0;
+            self.pointer_back_armed = false;
+            return;
+        }
+
+        self.apply_pointer_menu(dt, pointer_position, pointer_delta, wheel_y);
+    }
+
+    fn apply_pointer_running(&mut self, dt: f32, pointer_position: Vec2, pointer_delta: Vec2) {
+        let mut resume_due_to_pointer = false;
+        let mut pointer_direction = None;
+
+        if let Some(state) = self.running.as_mut() {
+            match state.phase {
+                RunningPhase::Replay => return,
+                RunningPhase::PointerIdlePause => {
+                    let anchor = state.pointer_idle_anchor.unwrap_or(pointer_position);
+                    if pointer_position.distance(anchor) > POINTER_DISPLACEMENT_THRESHOLD {
+                        resume_due_to_pointer = true;
+                        pointer_direction = direction_from_delta(pointer_position - anchor);
+                    }
+                }
+                RunningPhase::Active => {
+                    if state.idle_grace_timer > 0.0 {
+                        state.idle_grace_timer = (state.idle_grace_timer - dt).max(0.0);
+                    }
+                    if let Some(direction) = direction_from_delta(pointer_delta) {
+                        pointer_direction = Some(direction);
+                    }
+                    if state.idle_grace_timer > 0.0 {
+                        return;
+                    }
+
+                    if state.pointer_idle_anchor.is_none() {
+                        state.pointer_idle_anchor = Some(pointer_position);
+                    }
+
+                    let anchor = state.pointer_idle_anchor.unwrap_or(pointer_position);
+                    if pointer_position.distance(anchor) <= POINTER_DISPLACEMENT_THRESHOLD {
+                        state.pointer_idle_elapsed += dt;
+                        if state.pointer_idle_elapsed >= POINTER_IDLE_SECONDS {
+                            state.phase = RunningPhase::PointerIdlePause;
+                            state.pointer_idle_anchor = Some(pointer_position);
+                            state.pointer_idle_elapsed = 0.0;
+                        }
+                    } else {
+                        state.pointer_idle_anchor = Some(pointer_position);
+                        state.pointer_idle_elapsed = 0.0;
+                    }
+                }
+            }
+        }
+
+        if resume_due_to_pointer {
+            self.resume_from_pointer_idle_pause(Some(pointer_position));
+        }
+        if let Some(direction) = pointer_direction {
+            self.enqueue_running_direction(direction);
+        }
+    }
+
+    fn apply_pointer_menu(
+        &mut self,
+        dt: f32,
+        pointer_position: Vec2,
+        pointer_delta: Vec2,
+        wheel_y: f32,
+    ) {
+        if self.supports_scroll_navigation() {
+            if wheel_y > 0.0 {
+                self.apply_command(UiCommand::Up);
+            } else if wheel_y < 0.0 {
+                self.apply_command(UiCommand::Down);
+            }
+        }
+
+        let focus = self.pointer_focus_target(pointer_position);
+        if let Some(target) = focus {
+            self.apply_pointer_focus(target);
+            if self.pointer_focus_target == Some(target)
+                && pointer_delta.length() <= POINTER_DISPLACEMENT_THRESHOLD
+            {
+                self.pointer_focus_dwell += dt;
+            } else {
+                self.pointer_focus_dwell = dt;
+                self.pointer_focus_target = Some(target);
+                self.pointer_focus_armed = false;
+            }
+            if self.pointer_focus_dwell >= POINTER_DWELL_SECONDS && !self.pointer_focus_armed {
+                self.apply_command(UiCommand::Confirm);
+                self.pointer_focus_armed = true;
+            }
+        } else {
+            self.pointer_focus_target = None;
+            self.pointer_focus_dwell = 0.0;
+            self.pointer_focus_armed = false;
+        }
+
+        if self.is_menu_oriented_screen() && pointer_in_back_hotzone(pointer_position) {
+            if pointer_delta.length() <= POINTER_DISPLACEMENT_THRESHOLD {
+                self.pointer_back_dwell += dt;
+            } else {
+                self.pointer_back_dwell = dt;
+                self.pointer_back_armed = false;
+            }
+            if self.pointer_back_dwell >= POINTER_DWELL_SECONDS && !self.pointer_back_armed {
+                self.apply_command(UiCommand::Back);
+                self.pointer_back_armed = true;
+            }
+        } else {
+            self.pointer_back_dwell = 0.0;
+            self.pointer_back_armed = false;
+        }
+    }
+
+    fn apply_pointer_focus(&mut self, target: PointerFocusTarget) {
+        match target {
+            PointerFocusTarget::MainMenuItem(index) => self.main_menu_cursor = index,
+            PointerFocusTarget::ModeItem(index) => self.mode_cursor = index,
+            PointerFocusTarget::LoadoutSlot(index) => self.loadout_state.slot_cursor = index,
+            PointerFocusTarget::SettingsToggle => {}
+        }
+    }
+
+    fn pointer_focus_target(&self, pointer_position: Vec2) -> Option<PointerFocusTarget> {
+        match self.screen {
+            ScreenState::MainMenu => {
+                main_menu_item_at(pointer_position).map(PointerFocusTarget::MainMenuItem)
+            }
+            ScreenState::ModeSelect => {
+                mode_item_at(pointer_position).map(PointerFocusTarget::ModeItem)
+            }
+            ScreenState::Loadout => {
+                loadout_slot_at(pointer_position).map(PointerFocusTarget::LoadoutSlot)
+            }
+            ScreenState::Settings => {
+                settings_toggle_hit(pointer_position).then_some(PointerFocusTarget::SettingsToggle)
+            }
+            _ => None,
+        }
+    }
+
+    fn supports_scroll_navigation(&self) -> bool {
+        matches!(
+            self.screen,
+            ScreenState::MainMenu
+                | ScreenState::ModeSelect
+                | ScreenState::Loadout
+                | ScreenState::Leaderboard
+        )
+    }
+
+    fn is_menu_oriented_screen(&self) -> bool {
+        self.screen != ScreenState::Running
+    }
+
+    fn resume_from_pointer_idle_pause(&mut self, pointer_position: Option<Vec2>) {
+        let Some(state) = self.running.as_mut() else {
+            return;
+        };
+        if state.phase != RunningPhase::PointerIdlePause {
+            return;
+        }
+        state.phase = RunningPhase::Active;
+        state.pointer_idle_elapsed = 0.0;
+        state.idle_grace_timer = POINTER_IDLE_GRACE_SECONDS;
+        state.pointer_idle_anchor = pointer_position.or(state.pointer_idle_anchor);
+    }
+
     fn start_mode(&mut self, mode: GameMode, requested_loadout: Option<Vec<String>>) {
         self.message = None;
         match self.engine.start_run(mode, requested_loadout) {
@@ -479,6 +699,7 @@ impl SnakeGuiApp {
                     self.complete_running_session();
                 }
             }
+            RunningPhase::PointerIdlePause => {}
         }
     }
 
@@ -594,10 +815,10 @@ impl SnakeGuiApp {
             draw_text(item, 100.0, y, 34.0, color);
         }
         draw_text(
-            "Use Arrow Keys or WASD. Enter to confirm.",
+            "Arrow/WASD or pointer hover+dwell. Scroll navigates. Top-left dwell = Back.",
             80.0,
             430.0,
-            26.0,
+            24.0,
             GRAY,
         );
     }
@@ -614,7 +835,13 @@ impl SnakeGuiApp {
             };
             draw_text(mode_label(*mode), 100.0, y, 34.0, color);
         }
-        draw_text("Enter: Start    Esc: Back", 80.0, 460.0, 26.0, GRAY);
+        draw_text(
+            "Enter or dwell: Start    Esc or back hotzone: Back",
+            80.0,
+            460.0,
+            24.0,
+            GRAY,
+        );
     }
 
     fn draw_loadout(&self) {
@@ -627,7 +854,7 @@ impl SnakeGuiApp {
             WHITE,
         );
         draw_text(
-            "Slot Focus: Up/Down    Change Tool: Left/Right",
+            "Slot Focus: Up/Down or pointer hover    Change Tool: Left/Right or scroll",
             80.0,
             165.0,
             24.0,
@@ -663,7 +890,7 @@ impl SnakeGuiApp {
         }
 
         draw_text(
-            "Enter: Start Experimental    Esc: Back",
+            "Enter/dwell: Start Experimental    Esc/back hotzone: Back",
             80.0,
             560.0,
             24.0,
@@ -700,11 +927,18 @@ impl SnakeGuiApp {
             WHITE,
         );
         draw_text(
-            "Arrow/WASD to queue turns (deterministic). Esc ends run.",
+            "Arrow/WASD or pointer movement to steer. Esc ends run.",
             40.0,
             82.0,
             24.0,
             GRAY,
+        );
+        draw_text(
+            "Pointer idle <=2px for 0.5s pauses. Resume with arrow key or pointer move >2px.",
+            40.0,
+            108.0,
+            22.0,
+            LIGHTGRAY,
         );
 
         let board_width = state.run.board.width as f32 * CELL_SIZE;
@@ -737,22 +971,34 @@ impl SnakeGuiApp {
             draw_cell(origin_x, origin_y, *segment, color);
         }
 
-        if state.phase == RunningPhase::Replay {
-            draw_text(
-                "Replay on death active (mortal mode only)",
-                40.0,
-                660.0,
-                28.0,
-                YELLOW,
-            );
-            for segment in &state.replay_path {
-                draw_cell(
-                    origin_x,
-                    origin_y,
-                    *segment,
-                    Color::from_rgba(255, 255, 255, 38),
+        match state.phase {
+            RunningPhase::PointerIdlePause => {
+                draw_text(
+                    "Paused: pointer idle detected. Move pointer >2px or press arrow to resume.",
+                    40.0,
+                    660.0,
+                    26.0,
+                    YELLOW,
                 );
             }
+            RunningPhase::Replay => {
+                draw_text(
+                    "Replay on death active (mortal mode only)",
+                    40.0,
+                    660.0,
+                    28.0,
+                    YELLOW,
+                );
+                for segment in &state.replay_path {
+                    draw_cell(
+                        origin_x,
+                        origin_y,
+                        *segment,
+                        Color::from_rgba(255, 255, 255, 38),
+                    );
+                }
+            }
+            RunningPhase::Active => {}
         }
     }
 
@@ -805,10 +1051,10 @@ impl SnakeGuiApp {
         }
 
         draw_text(
-            "Enter: Main Menu    Right: Leaderboards",
+            "Enter/dwell: Main Menu    Right: Leaderboards    Back hotzone: Main Menu",
             80.0,
             560.0,
-            26.0,
+            24.0,
             GRAY,
         );
     }
@@ -860,7 +1106,7 @@ impl SnakeGuiApp {
         }
 
         draw_text(
-            "Left/Right: Change Mode    Enter/Esc: Main Menu",
+            "Left/Right or scroll: Change Mode    Enter/dwell/Esc: Main Menu",
             80.0,
             640.0,
             24.0,
@@ -884,10 +1130,10 @@ impl SnakeGuiApp {
             LIGHTGRAY,
         );
         draw_text(
-            "Left/Right/Enter: Toggle    Esc: Back",
+            "Left/Right/Enter/dwell: Toggle    Esc/back hotzone: Back",
             80.0,
             300.0,
-            26.0,
+            24.0,
             GRAY,
         );
         draw_text(
@@ -959,6 +1205,71 @@ fn cycle_index(current: usize, delta: i32, len: usize) -> usize {
     }
     let len_i = len as i32;
     (((current as i32 + delta) % len_i + len_i) % len_i) as usize
+}
+
+fn direction_from_delta(delta: Vec2) -> Option<Direction> {
+    if delta.length() <= POINTER_DISPLACEMENT_THRESHOLD {
+        return None;
+    }
+    if delta.x.abs() >= delta.y.abs() {
+        if delta.x >= 0.0 {
+            Some(Direction::Right)
+        } else {
+            Some(Direction::Left)
+        }
+    } else if delta.y >= 0.0 {
+        Some(Direction::Down)
+    } else {
+        Some(Direction::Up)
+    }
+}
+
+fn main_menu_item_at(pointer_position: Vec2) -> Option<usize> {
+    if pointer_position.x < 80.0 || pointer_position.x > 480.0 {
+        return None;
+    }
+    MAIN_MENU_ITEMS.iter().enumerate().find_map(|(index, _)| {
+        let y = 210.0 + index as f32 * 50.0;
+        let top = y - 36.0;
+        let bottom = y + 12.0;
+        (pointer_position.y >= top && pointer_position.y <= bottom).then_some(index)
+    })
+}
+
+fn mode_item_at(pointer_position: Vec2) -> Option<usize> {
+    if pointer_position.x < 80.0 || pointer_position.x > 520.0 {
+        return None;
+    }
+    MODES.iter().enumerate().find_map(|(index, _)| {
+        let y = 200.0 + index as f32 * 52.0;
+        let top = y - 36.0;
+        let bottom = y + 12.0;
+        (pointer_position.y >= top && pointer_position.y <= bottom).then_some(index)
+    })
+}
+
+fn loadout_slot_at(pointer_position: Vec2) -> Option<usize> {
+    if pointer_position.x < 80.0 || pointer_position.x > 910.0 {
+        return None;
+    }
+    (0..3).find(|slot| {
+        let y = 230.0 + *slot as f32 * 90.0;
+        pointer_position.y >= (y - 42.0) && pointer_position.y <= (y + 20.0)
+    })
+}
+
+fn settings_toggle_hit(pointer_position: Vec2) -> bool {
+    pointer_position.x >= 90.0
+        && pointer_position.x <= 910.0
+        && pointer_position.y >= 185.0
+        && pointer_position.y <= 245.0
+}
+
+fn pointer_in_back_hotzone(pointer_position: Vec2) -> bool {
+    pointer_position.x >= 16.0
+        && pointer_position.x <= 136.0
+        && pointer_position.y >= 18.0
+        && pointer_position.y <= 72.0
 }
 
 fn is_within_board(point: Point, board_width: i32, board_height: i32) -> bool {
@@ -1118,6 +1429,65 @@ mod tests {
             app.apply_command(UiCommand::Confirm);
             assert_eq!(app.screen, ScreenState::MainMenu);
         }
+    }
+
+    fn enter_pointer_idle_pause(app: &mut SnakeGuiApp) {
+        app.start_mode(GameMode::Practice, None);
+        assert_eq!(app.screen, ScreenState::Running);
+        app.apply_pointer_input(0.25, vec2(320.0, 320.0), 0.0);
+        app.apply_pointer_input(0.30, vec2(320.0, 320.0), 0.0);
+        assert_eq!(
+            app.running.as_ref().unwrap().phase,
+            RunningPhase::PointerIdlePause
+        );
+    }
+
+    #[test]
+    fn pointer_idle_pause_enters_and_resumes_with_keyboard() {
+        let mut app = SnakeGuiApp::new();
+        enter_pointer_idle_pause(&mut app);
+
+        app.apply_command(UiCommand::Up);
+
+        let running = app.running.as_ref().unwrap();
+        assert_eq!(running.phase, RunningPhase::Active);
+        assert_eq!(
+            running.queued_directions.front().copied(),
+            Some(Direction::Up)
+        );
+    }
+
+    #[test]
+    fn pointer_idle_pause_resumes_with_pointer_motion() {
+        let mut app = SnakeGuiApp::new();
+        enter_pointer_idle_pause(&mut app);
+
+        app.apply_pointer_input(0.01, vec2(325.5, 320.0), 0.0);
+
+        assert_eq!(app.running.as_ref().unwrap().phase, RunningPhase::Active);
+    }
+
+    #[test]
+    fn pointer_navigation_matches_menu_traversal_and_confirmation() {
+        let mut app = SnakeGuiApp::new();
+        assert_eq!(app.screen, ScreenState::MainMenu);
+
+        app.apply_pointer_input(0.01, vec2(110.0, 260.0), 0.0);
+        assert_eq!(app.main_menu_cursor, 1);
+
+        app.apply_pointer_input(0.5, vec2(110.0, 260.0), 0.0);
+        assert_eq!(app.screen, ScreenState::Leaderboard);
+
+        app.apply_command(UiCommand::Back);
+        app.apply_pointer_input(0.01, vec2(110.0, 210.0), 0.0);
+        app.apply_command(UiCommand::Confirm);
+        assert_eq!(app.screen, ScreenState::ModeSelect);
+
+        app.apply_pointer_input(0.01, vec2(760.0, 90.0), -1.0);
+        assert_eq!(app.mode_cursor, 1);
+
+        app.apply_pointer_input(0.01, vec2(760.0, 90.0), 1.0);
+        assert_eq!(app.mode_cursor, 0);
     }
 
     #[test]

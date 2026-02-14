@@ -40,3 +40,5 @@ Use Cargo from the repository root:
 
 ## OpenSpec Notes
 If a change is spec-driven, update artifacts under `openspec/changes/...` alongside code so implementation and specs remain aligned.
+
+## Please try your best to reply in Chinese.
