@@ -18,4 +18,3 @@
 - [x] 3.2 Add GUI tests in `src/gui.rs` covering idle-pause entry, resume via keyboard, and resume via pointer movement.
 - [x] 3.3 Add GUI tests covering non-click pointer navigation equivalence for menu traversal and confirmation.
 - [x] 3.4 Run `cargo test` and adjust tests/messages until behavior and specs align.
-
