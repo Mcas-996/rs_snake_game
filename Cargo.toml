@@ -1,6 +1,6 @@
 [package]
 name = "snake_gui"
-version = "4.0.0"
+version = "0.6.0"
 edition = "2024"
 repository = "https://github.com/Mcas-996/rs_snake_game"
 homepage = "https://github.com/Mcas-996/rs_snake_game"
