@@ -7,10 +7,10 @@ use crate::{GameEngine, GameMode, GameRun, Point, Profile, ToolCategory, policy_
 
 const WINDOW_WIDTH: i32 = 1000;
 const WINDOW_HEIGHT: i32 = 760;
-const SIM_TICK_SECONDS: f32 = 0.12;
+const SIM_TICK_SECONDS: f32 = 0.18;
 const REPLAY_SECONDS: f32 = 0.85;
 const CELL_SIZE: f32 = 32.0;
-const INITIAL_FOOD_COUNT: usize = 10;
+const INITIAL_FOOD_COUNT: usize = 6;
 const FOOD_REFILL_EVERY_EATEN: u64 = 2;
 const FOOD_REFILL_COUNT: usize = 3;
 const POINTER_IDLE_SECONDS_OUTSIDE_BOARD: f32 = 0.01;
