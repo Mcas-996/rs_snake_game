@@ -518,7 +518,7 @@ impl GameEngine {
             metrics: RunMetrics::default(),
             ended: false,
             show_replay: false,
-            grace_ticks_remaining: 0,
+            grace_ticks_remaining: 3,
             active_loadout: loadout,
             effects,
         })
@@ -547,7 +547,7 @@ impl GameEngine {
                 if let Some(head) = run.snake.first_mut() {
                     *head = safe;
                 }
-                run.grace_ticks_remaining = 1;
+                run.grace_ticks_remaining = 2;
             }
         }
         Ok(())
@@ -667,7 +667,51 @@ mod tests {
             .expect("must reposition to safe tile");
 
         assert!(!run.ended);
+        assert_eq!(run.grace_ticks_remaining, 2);
+    }
+
+    #[test]
+    fn new_run_starts_with_three_grace_ticks() {
+        let engine = GameEngine::new(Profile::default());
+        let run = engine.start_run(GameMode::Practice, None).unwrap();
+        assert_eq!(run.grace_ticks_remaining, 3);
+    }
+
+    #[test]
+    fn grace_ticks_decrement_on_each_tick() {
+        let engine = GameEngine::new(Profile::default());
+        let mut run = engine.start_run(GameMode::Practice, None).unwrap();
+        assert_eq!(run.grace_ticks_remaining, 3);
+
+        run.tick();
+        assert_eq!(run.grace_ticks_remaining, 2);
+
+        run.tick();
         assert_eq!(run.grace_ticks_remaining, 1);
+
+        run.tick();
+        assert_eq!(run.grace_ticks_remaining, 0);
+
+        run.tick();
+        assert_eq!(run.grace_ticks_remaining, 0);
+    }
+
+    #[test]
+    fn collision_grace_period_does_not_stack() {
+        let mut engine = GameEngine::new(Profile::default());
+        let mut run = engine.start_run(GameMode::Invincible, None).unwrap();
+        assert_eq!(run.grace_ticks_remaining, 3);
+
+        run.tick();
+        run.tick();
+        assert_eq!(run.grace_ticks_remaining, 1);
+
+        let body = run.snake.clone();
+        engine
+            .handle_collision(&mut run, body[0])
+            .expect("must reposition to safe tile");
+
+        assert_eq!(run.grace_ticks_remaining, 2);
     }
 
     #[test]
